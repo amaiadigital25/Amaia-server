@@ -1,20 +1,193 @@
-<html>
+<!DOCTYPE html>
+<html lang="es">
 <head>
-<title>AmaiaDigital Panel</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Amaia Automotor | Chapa y Pintura</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: #131a30;
+      --text: #e6ebff;
+      --muted: #a9b3d6;
+      --accent: #5a8bff;
+      --ok: #23c483;
+      --danger: #ff5d6c;
+      --border: #2a355f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(130deg, #090d1a, #101a37);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+    h1, h2 { margin-top: 0; }
+    p { color: var(--muted); }
+    label { display: block; font-size: 0.9rem; margin: 8px 0 6px; }
+    input, select, textarea, button {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 10px;
+      background: #0d1430;
+      color: var(--text);
+    }
+    button {
+      background: var(--accent);
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    button.secondary { background: #384469; }
+    .hidden { display: none; }
+    .row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .status-ok { color: var(--ok); }
+    .status-bad { color: var(--danger); }
+    ul { padding-left: 20px; }
+    .budget { background: #0f1835; border-radius: 10px; padding: 12px; margin-top: 12px; }
+    @media (max-width: 700px) { .row { grid-template-columns: 1fr; } }
+  </style>
 </head>
-
 <body>
+  <div class="container">
+    <div class="card">
+      <h1>Amaia Automotor</h1>
+      <p>Servicio profesional de <strong>chapa y pintura</strong> con diagnóstico asistido por IA y presupuesto detallado.</p>
+    </div>
 
-<h1>Servidor AmaiaDigital</h1>
+    <div class="card" id="loginCard">
+      <h2>Acceso de usuarios</h2>
+      <label for="email">Email</label>
+      <input id="email" type="email" placeholder="cliente@ejemplo.com" />
+      <label for="password">Contraseña</label>
+      <input id="password" type="password" placeholder="••••••••" />
+      <button onclick="login()">Ingresar</button>
+      <p id="loginStatus"></p>
+    </div>
 
-<button onclick="startBot()">Iniciar Bot</button>
+    <div class="card hidden" id="appCard">
+      <h2>Nuevo presupuesto con IA</h2>
+      <div class="row">
+        <div>
+          <label for="cliente">Cliente</label>
+          <input id="cliente" placeholder="Nombre y apellido" />
+        </div>
+        <div>
+          <label for="vehiculo">Vehículo</label>
+          <input id="vehiculo" placeholder="Marca, modelo y año" />
+        </div>
+      </div>
 
-<script>
-function startBot(){
-fetch("/bot/start")
-alert("Bot iniciado")
-}
-</script>
+      <div class="row">
+        <div>
+          <label for="danio">Tipo de daño</label>
+          <select id="danio">
+            <option value="raspon">Raspón superficial</option>
+            <option value="abolladura">Abolladura mediana</option>
+            <option value="choque">Choque fuerte</option>
+          </select>
+        </div>
+        <div>
+          <label for="paneles">Cantidad de piezas</label>
+          <input id="paneles" type="number" min="1" value="1" />
+        </div>
+      </div>
 
+      <label for="detalle">Detalle del cliente</label>
+      <textarea id="detalle" rows="3" placeholder="Descripción del daño, color, urgencia..."></textarea>
+
+      <button onclick="generarPresupuesto()">Generar presupuesto</button>
+      <button class="secondary" onclick="startBot()">Iniciar Bot WhatsApp</button>
+      <p id="botStatus"></p>
+
+      <div id="resultado" class="budget hidden"></div>
+    </div>
+  </div>
+
+  <script>
+    let token = ""
+
+    async function login() {
+      const email = document.getElementById("email").value.trim()
+      const password = document.getElementById("password").value.trim()
+      const loginStatus = document.getElementById("loginStatus")
+
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        loginStatus.className = "status-bad"
+        loginStatus.textContent = data.error || "No se pudo iniciar sesión"
+        return
+      }
+
+      token = data.token
+      loginStatus.className = "status-ok"
+      loginStatus.textContent = "Login correcto"
+      document.getElementById("loginCard").classList.add("hidden")
+      document.getElementById("appCard").classList.remove("hidden")
+    }
+
+    async function generarPresupuesto() {
+      const payload = {
+        cliente: document.getElementById("cliente").value,
+        vehiculo: document.getElementById("vehiculo").value,
+        tipoDanio: document.getElementById("danio").value,
+        piezas: Number(document.getElementById("paneles").value),
+        detalle: document.getElementById("detalle").value
+      }
+
+      const res = await fetch("/api/quote/estimate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        alert(data.error || "Error al calcular presupuesto")
+        return
+      }
+
+      const resultado = document.getElementById("resultado")
+      resultado.classList.remove("hidden")
+      resultado.innerHTML = `
+        <h3>Presupuesto #${data.id}</h3>
+        <p><strong>Cliente:</strong> ${data.cliente}</p>
+        <p><strong>Vehículo:</strong> ${data.vehiculo}</p>
+        <p><strong>Análisis IA:</strong> ${data.aiAnalysis}</p>
+        <ul>${data.items.map(item => `<li>${item.nombre}: $${item.precio}</li>`).join("")}</ul>
+        <p><strong>Total:</strong> $${data.total}</p>
+      `
+    }
+
+    async function startBot() {
+      const res = await fetch("/bot/start")
+      const text = await res.text()
+      document.getElementById("botStatus").textContent = text
+    }
+  </script>
 </body>
 </html>
